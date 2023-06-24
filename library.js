@@ -1,15 +1,15 @@
-const fs = require('fs').promises;
+const fs = require('fs');
 const ellipticcurve = require("@starkbank/ecdsa");
-const { read } = require('fs');
+const fsp = fs.promises;
 const path = require('path');
 const ECDSA = ellipticcurve.Ecdsa
 const tar = require('tar');
 const axios = require("axios");
-
+const FormData = require('form-data');
 
 async function readJsonFile() {
     try {
-        const data = await fs.readFile(path.join(__dirname, 'extracted', 'updatepackages', 'metadata.json'), 'utf8');
+        const data = await fsp.readFile(path.join(__dirname, 'extracted', 'updatepackages', 'metadata.json'), 'utf8');
         const obj = JSON.parse(data);
         return obj;
     } catch (err) {
@@ -24,20 +24,34 @@ const downloadAndExtract = async () => {
 
     return new Promise(async (resolve, reject) => {
         let response = await axios({
-            url: "http://localhost:3000/updatepackages/updatepackages.tar",
+            url: "http://localhost:3001/updatepackages/updatepackages.tar",
             method: 'GET',
             responseType: 'stream'
         });
 
-        let tarStream = response.data.pipe(tar.extract({ cwd: './extracted' }));
+        const writer = fs.createWriteStream('./updatepackages/updatepackages.tar');
+        response.data.pipe(writer);
 
-        tarStream.on('finish', function () {
-            console.log('The extraction of updatepackages.tar has been completed.');
-            resolve()
+        writer.on('finish', async function () {
+            console.log('The download of updatepackages.tar has been completed.');
+
+
+            let tarStream = fs.createReadStream('./updatepackages/updatepackages.tar')
+                .pipe(tar.extract({ cwd: './extracted' }));
+
+            tarStream.on('finish', function () {
+                console.log('The extraction of updatepackages.tar has been completed.');
+                resolve();
+            });
+
+            tarStream.on('error', function (error) {
+                console.log('Error during extraction: ', error);
+                reject();
+            });
         });
 
-        tarStream.on('error', function (error) {
-            console.log('Error during extraction: ', error);
+        writer.on('error', function (err) {
+            console.log('Error during download: ', err);
             reject();
         });
     })
@@ -51,4 +65,19 @@ const verify_updatePackages = (result) => {
     -----END PUBLIC KEY-----`))
 }
 
-module.exports = { readJsonFile, downloadAndExtract, verify_updatePackages }
+async function uploadFile() {
+    const formData = new FormData();
+    formData.append('file', fs.createReadStream(path.join(__dirname, 'updatepackages', 'updatepackages.tar')));
+
+    try {
+        const res = await axios.post('http://localhost:3000/upload', formData, {
+            headers: formData.getHeaders()
+        });
+        return res.data.success;
+    } catch (err) {
+        console.error(err);
+        return false;
+    }
+}
+
+module.exports = { readJsonFile, downloadAndExtract, verify_updatePackages, uploadFile }

@@ -1,0 +1,8 @@
+version: "3"
+services:
+  your-service:
+    image: your-new-image:latest
+    environment:
+      - ENV_VAR=...
+    volumes:
+      - ./data:/data

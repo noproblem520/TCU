@@ -1,4 +1,4 @@
-const { readJsonFile, downloadAndExtract, verify_updatePackages } = require("./library.js")
+const { readJsonFile, downloadAndExtract, verify_updatePackages, uploadFile } = require("./library.js")
 
 
 
@@ -6,7 +6,16 @@ const main = async () => {
     await downloadAndExtract();
     const result = await readJsonFile();
     if (verify_updatePackages(result)) {
-        console.log("Signature verification succeeded.Posting update packages to Vehicle Computer...");
+        try {
+            console.log("Signature verification succeeded.Posting update packages to Vehicle Computer...");
+            if (await uploadFile()) {
+                console.log("Upload Succeeded!");
+            } else {
+                console.log("Upload Failed!");
+            }
+        } catch (e) {
+            console.log(e);
+        }
     } else {
         console.log("Signature verification failed.")
     }
